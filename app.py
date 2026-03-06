@@ -67,6 +67,44 @@ with c_alt2:
 
 st.markdown("---")
 
-# 4. İŞLEM BUTONLARI
+# --- 4. İŞLEM BUTONLARI (Düzeltilmiş Bölüm) ---
 col1, col2, col3 = st.columns(3)
 
+with col1:
+    if st.button("🔊 Profesyonel Seslendir", use_container_width=True):
+        if st.session_state.text:
+            with st.spinner(f"{secilen_ses} hazırlanıyor..."):
+                try:
+                    # Seslendirme motorunu çalıştıran gizli bölüm
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    audio_raw = loop.run_until_complete(
+                        generate_voice(st.session_state.text, VOICES[secilen_ses], okuma_hizi)
+                    )
+                    st.audio(audio_raw)
+                except Exception as e:
+                    st.error(f"Ses hatası: {e}")
+        else:
+            st.warning("Önce metin yükleyin!")
+
+with col2:
+    if st.button("📝 Akıllı Özet", use_container_width=True):
+        if st.session_state.text:
+            # Metni cümlelere ayırıp ilk birkaçını özet olarak sunar
+            ozet_cumleler = [s.strip() for s in st.session_state.text.split('.') if len(s) > 10]
+            st.info("📌 **Özet Notlar:**\n\n• " + ". \n\n• ".join(ozet_cumleler[:5]) + ".")
+        else:
+            st.warning("Özetlenecek içerik yok!")
+
+with col3:
+    if st.button("❓ Soru Üret", use_container_width=True):
+        if st.session_state.text:
+            st.subheader("✍️ Çalışma Soruları")
+            soru_cumleleri = [s.strip() for s in st.session_state.text.split('.') if len(s) > 30]
+            if soru_cumleleri:
+                for _ in range(min(3, len(soru_cumleleri))):
+                    secilen = random.choice(soru_cumleleri)
+                    st.write(f"👉 **{secilen[:80]}...** konusunu açıklar mısın?")
+                    st.divider()
+        else:
+            st.warning("Soru üretilecek veri yok!")
