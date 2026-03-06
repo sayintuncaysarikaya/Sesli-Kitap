@@ -68,4 +68,5 @@ with c_alt2:
 st.markdown("---")
 
 # 4. İŞLEM BUTONLARI
-col1, col2, col3 =
+col1, col2, col3 = st.columns(3)
+
