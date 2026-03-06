@@ -12,8 +12,8 @@ st.set_page_config(page_title="Pro Ders Asistanı", page_icon="🎙️", layout=
 VOICES = {
     "Ahmet (Doğal/Erkek)": "tr-TR-AhmetNeural",
     "Emel (Yumuşak/Kadın)": "tr-TR-EmelNeural",
-    "Google (Net/Erkek)": "tr-TR-Standard-B", # Alternatif tonlar için
-    "Seda (Akıcı/Kadın)": "tr-TR-Standard-A"
+    "Seda (Akıcı/Kadın)": "tr-TR-Standard-A",
+    "Can (Net/Erkek)": "tr-TR-Standard-B"
 }
 
 # KARAKTER ONARICI
@@ -26,8 +26,8 @@ def temizle(text):
 
 # GELİŞMİŞ SES ÜRETİCİ
 async def generate_voice(text, voice_code, rate):
-    # Rate formatı: +10% veya -10% şeklinde olmalı
     speed = f"{rate:+d}%"
+    # Sunucuyu yormamak için ilk 8000 karakteri alır
     communicate = edge_tts.Communicate(text[:8000], voice_code, rate=speed)
     audio_data = b""
     async for chunk in communicate.stream():
@@ -46,38 +46,62 @@ okuma_hizi = st.sidebar.slider("Okuma Hızı", -50, 50, 0)
 # PDF YÜKLEME
 file = st.file_uploader("Notlarınızı Yükleyin (PDF)", type=["pdf"])
 
+# Session State Hazırlığı (Metnin silinmemesi için)
+if "text" not in st.session_state:
+    st.session_state.text = ""
+
+# PDF'den metin çıkarma işlemi
 if file:
-    with st.spinner("Metin işleniyor..."):
+    with st.spinner("Metin PDF'den ayıklanıyor..."):
         reader = PdfReader(file)
         raw = "".join([p.extract_text() for p in reader.pages if p.extract_text()])
         st.session_state.text = temizle(raw)
 
-if "text" in st.session_state:
-    st.text_area("İşlenen Metin (Düzenlenebilir):", value=st.session_state.text, height=200)
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("🔊 Profesyonel Seslendir", use_container_width=True):
-            if st.session_state.text:
-                with st.spinner("Yapay zeka sesi hazırlanıyor..."):
+# METİN YAZMA/DÜZENLEME KUTUCUĞU (Her zaman görünür)
+st.session_state.text = st.text_area(
+    "Ders Metni (Buraya yazabilir veya PDF yükleyebilirsiniz):", 
+    value=st.session_state.text, 
+    height=300
+)
+
+st.markdown("---")
+
+# İŞLEM BUTONLARI
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    if st.button("🔊 Profesyonel Seslendir", use_container_width=True):
+        if st.session_state.text:
+            with st.spinner("Yapay zeka sesi hazırlanıyor..."):
+                try:
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     audio = loop.run_until_complete(
                         generate_voice(st.session_state.text, VOICES[secilen_ses], okuma_hizi)
                     )
                     st.audio(audio)
-            else: st.error("Lütfen önce bir PDF yükleyin.")
+                except Exception as e:
+                    st.error(f"Ses oluşturulamadı: {e}")
+        else:
+            st.warning("Seslendirecek metin bulunamadı!")
 
-    with col2:
-        if st.button("📝 Akıllı Özet", use_container_width=True):
+with col2:
+    if st.button("📝 Akıllı Özet", use_container_width=True):
+        if st.session_state.text:
             sentences = [s.strip() for s in st.session_state.text.split('.') if len(s) > 10]
-            st.info("📌 **Özet Notlar:**\n\n" + ". \n\n• ".join(sentences[:6]) + ".")
+            st.info("📌 **Özet Notlar:**\n\n• " + ". \n\n• ".join(sentences[:6]) + ".")
+        else:
+            st.warning("Özetlenecek metin yok!")
 
-    with col3:
-        if st.button("❓ Soru Tahmini", use_container_width=True):
+with col3:
+    if st.button("❓ Soru Tahmini", use_container_width=True):
+        if st.session_state.text:
             st.subheader("✍️ Muhtemel Sınav Soruları")
             sentences = [s.strip() for s in st.session_state.text.split('.') if len(s) > 30]
-            for _ in range(4):
-                st.write(f"👉 {random.choice(sentences)[:90]}... konusunu nasıl açıklarsınız?")
-                st.divider()
+            if sentences:
+                for _ in range(min(4, len(sentences))):
+                    soru_temeli = random.choice(sentences)
+                    st.write(f"👉 {soru_temeli[:90]}... konusunu nasıl açıklarsınız?")
+                    st.divider()
+        else:
+            st.warning("Soru üretilecek metin yok!")
